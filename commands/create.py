@@ -8,6 +8,7 @@ from ..libs.sublimefunctions import (
     get_template,
     refresh_sidebar,
     transform_aliases,
+    warn_invalid_aliases,
 )
 from ..libs.pathhelper import user_friendly
 from .fmcommand import FmWindowCommand
@@ -63,7 +64,9 @@ class FmCreateCommand(FmWindowCommand):
             # creating from the sidebar
             create_from = paths[0].replace("${packages}", sublime.packages_path())
 
-            create_from = transform_aliases(self.window, create_from)
+            valid, create_from = transform_aliases(self.window, create_from)
+            if not valid:
+                warn_invalid_aliases()
 
             # you can right-click on a file, and run `New...`
             if os.path.isfile(create_from):

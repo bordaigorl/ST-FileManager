@@ -3,7 +3,7 @@ import os
 import sublime
 
 from .pathhelper import computer_friendly, user_friendly
-from .sublimefunctions import sm, transform_aliases
+from .sublimefunctions import sm, transform_aliases, warn_invalid_aliases
 
 
 def set_status(view, key, value):
@@ -182,7 +182,7 @@ class InputForPath(object):
     def input_on_change(self, input_path):
         self.input_path = user_friendly(input_path)
 
-        self.input_path = transform_aliases(self.window, self.input_path)
+        self.valid, self.input_path = transform_aliases(self.window, self.input_path)
         # get changed inputs and create_from from the on_change user function
         if self.user_on_change:
             new_values = self.user_on_change(
@@ -283,6 +283,9 @@ class InputForPath(object):
         if self.log_in_status_bar:
             set_status(self.view, self.STATUS_KEY, "")
         # use the one returned by the on change function
+        if not self.valid:
+            warn_invalid_aliases()
+            return
         input_path = self.input_path
         computer_path = computer_friendly(os.path.join(self.create_from, input_path))
         # open browser

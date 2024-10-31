@@ -1,8 +1,14 @@
 import os
+import re
 
 import sublime
 
 TEMPLATE_FOLDER = None
+
+# The UNESCAPED_DOLLAR regex matches a $ preceded by an even number of \
+# (which would escape themselves and not the dollar)
+# followed by a letter or underscore (without which the $ does not denote an expandable variable)
+UNEXPANDED_VAR = re.compile(r'(?<!\\)(\\\\)*\$(\w|\d|_|\{)')
 
 
 def md(*t, **kwargs):
@@ -100,38 +106,29 @@ def transform_aliases(window, string):
     vars = window.extract_variables()
     vars.update(get_settings().get("aliases"))
 
-    def has_unescaped_dollar(string):
-        start = 0
-        while True:
-            index = string.find("$", start)
-            if index < 0:
-                return False
-            elif string[index - 1] == "\\":
-                start = index + 1
-            else:
-                return True
-
     string = string.replace("$$", "\\$")
-
-    inifinite_loop_counter = 0
-    while has_unescaped_dollar(string):
-        inifinite_loop_counter += 1
-        if inifinite_loop_counter > 100:
-            sublime.error_message(
-                "Infinite loop: you better check your "
-                "aliases, they're calling each other "
-                "over and over again."
-            )
-            if get_settings().get("open_help_on_alias_infinite_loop", True) is True:
-                sublime.run_command(
-                    "open_url",
-                    {
-                        "url": "https://github.com/math2001/ "
-                        "FileManager/wiki/Aliases "
-                        "#watch-out-for-infinite-loops"
-                    },
-                )
-            return string
+    string = sublime.expand_variables(string, vars)
+    expansion_count = 0
+    while UNEXPANDED_VAR.search(string):
+        expansion_count += 1
+        if expansion_count > len(vars):
+            return (False, string)
         string = sublime.expand_variables(string, vars)
 
-    return string
+    return (True, string)
+
+
+def warn_invalid_aliases():
+    sublime.error_message(
+        "Invalid aliases: either your alias definitions are circular "
+        "or your input was not escaping $ correctly (i.e. with $$)."
+    )
+    if get_settings().get("open_help_on_alias_infinite_loop", True) is True:
+        sublime.run_command(
+            "open_url",
+            {
+                "url": "https://github.com/math2001/ "
+                "FileManager/wiki/Aliases "
+                "#watch-out-for-infinite-loops"
+            },
+        )
